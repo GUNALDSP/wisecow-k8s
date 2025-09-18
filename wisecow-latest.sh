@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+SRVPORT=4499
+RSPFILE=/tmp/response  # Change 1: Use /tmp instead of current directory
+rm -f $RSPFILE
+mkfifo $RSPFILE
+
+get_api() {
+    read line
+    echo $line
+}
+
+handleRequest() {
+    get_api
+    mod=`fortune`
+cat <<EOF > $RSPFILE
+HTTP/1.1 200 OK
+Content-Type: text/html
+
+<pre>`cowsay $mod`</pre>
+EOF
+}
+
+prerequisites() {
+    command -v cowsay >/dev/null 2>&1 &&
+    command -v fortune >/dev/null 2>&1 || 
+        { 
+            echo "Install prerequisites."
+            exit 1
+        }
+}
+
+main() {
+    prerequisites
+    echo "Wisdom served on port=$SRVPORT..."
+    while [ 1 ]; do
+        cat $RSPFILE | nc -l -p $SRVPORT | handleRequest  # Change 2: Add -p flag
+        sleep 0.01
+    done
+}
+
+main
