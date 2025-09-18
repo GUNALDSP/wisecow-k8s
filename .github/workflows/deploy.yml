@@ -1,47 +1,52 @@
-name: Build and Deploy Wisecow
+name: Build and Deploy to Local Minikube
 
 on:
   push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+    branches:
+      - main
 
 jobs:
   build-and-deploy:
-    runs-on: ubuntu-latest
-    
+    runs-on: self-hosted   # Must be your local machine running Minikube
+
     steps:
-    - uses: actions/checkout@v3
-    
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v2
-    
-    - name: Login to Docker Hub
-      uses: docker/login-action@v2
-      with:
-        username: ${{ secrets.DOCKER_USERNAME }}
-        password: ${{ secrets.DOCKER_PASSWORD }}
-    
-    - name: Build and push Docker image
-      uses: docker/build-push-action@v4
-      with:
-        context: .
-        push: true
-        tags: ${{ secrets.DOCKER_USERNAME }}/wisecow:${{ github.sha }},${{ secrets.DOCKER_USERNAME }}/wisecow:latest
-    
-    - name: Set up kubectl
-      uses: azure/setup-kubectl@v3
-      with:
-        version: 'latest'
-    
-    - name: Configure kubeconfig
+    - name: Checkout Code
+      uses: actions/checkout@v3
+
+    - name: Configure Docker to use Minikube
       run: |
-        mkdir -p ~/.kube
-        echo "${{ secrets.KUBECONFIG_DATA }}" | base64 -d > ~/.kube/config
-    
-    - name: Deploy to Kubernetes
+        eval $(minikube -p minikube docker-env)
+        docker info
+
+    - name: Build Docker image
       run: |
-        kubectl apply -f k8s/namespace.yaml
-        kubectl apply -f k8s/deployment.yaml
-        kubectl apply -f k8s/service.yaml
+        docker build -t wisecow:latest .
+        docker tag wisecow:latest wisecow:${{ github.sha }}
+
+    - name: Apply namespace
+      run: kubectl apply -f k8s/namespace.yaml
+
+    - name: Apply ConfigMap
+      run: kubectl apply -f k8s/configmap.yaml
+
+    - name: Deploy application
+      run: kubectl apply -f k8s/deployment.yaml
+
+    - name: Deploy service
+      run: kubectl apply -f k8s/service.yaml
+
+    - name: Deploy ingress
+      run: |
+        minikube addons enable ingress
         kubectl apply -f k8s/ingress.yaml
+
+    - name: Verify deployment
+      run: |
+        kubectl get all -n wisecow-app
+        kubectl get svc -n wisecow-app
+        kubectl get ingress -n wisecow-app
+
+    - name: Print Application URL
+      run: |
+        MINIKUBE_IP=$(minikube ip)
+        echo "Your app is running at: http://$MINIKUBE_IP:30080"
