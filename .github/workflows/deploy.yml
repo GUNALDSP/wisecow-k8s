@@ -34,13 +34,14 @@ jobs:
       with:
         version: 'latest'
     
-    - name: Configure kubectl
+    - name: Configure kubeconfig
       run: |
         mkdir -p ~/.kube
         echo "${{ secrets.KUBECONFIG_DATA }}" | base64 -d > ~/.kube/config
     
     - name: Deploy to Kubernetes
       run: |
-        export KUBECONFIG=kubeconfig
-        kubectl apply -f k8s/
-        kubectl set image deployment/wisecow-deployment wisecow=${{ secrets.DOCKER_USERNAME }}/wisecow:${{ github.sha }} -n wisecow-app
+        kubectl apply -f k8s/namespace.yaml
+        kubectl apply -f k8s/deployment.yaml
+        kubectl apply -f k8s/service.yaml
+        kubectl apply -f k8s/ingress.yaml
