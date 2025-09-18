@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wisecow-config
+  namespace: wisecow-app
+data:
+  SERVER_PORT: "4499"
